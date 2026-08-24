@@ -1242,6 +1242,7 @@ export class DevEnvironment {
       this.debugLog(`Portless unavailable; using direct localhost: ${this.portlessFallbackReason}`)
       if (!canUseTUI) {
         console.warn(chalk.yellow("Portless unavailable; using direct localhost."))
+        console.warn(chalk.gray(this.portlessFallbackReason))
       }
     }
 
@@ -1483,7 +1484,7 @@ export class DevEnvironment {
       // Complete startup with success message only in non-TUI mode
       this.spinner.succeed("Development environment ready!")
 
-      // Regular console output (when TUI is disabled with --no-tui)
+      // Regular console output (non-TUI default)
       console.log(chalk.cyan(`Logs: ${this.options.logFile}`))
       console.log(chalk.cyan("☝️ Give this to an AI to auto debug and fix your app\n"))
       console.log(chalk.cyan(`🌐 Your App: ${this.preferredAppUrl}`))

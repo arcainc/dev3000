@@ -38,7 +38,7 @@ Use `npm install -g dev3000` only when Bun is unavailable.
 3. Start d3k with the agent's shell/process tool as a retained background or yielded session:
 
 ```bash
-d3k --no-agent --no-tui -t
+d3k -t
 ```
 
 Do not wait for this long-running command to exit. Keep its process/session handle so you can monitor or stop it later. Prefer the execution tool's background/session support over shelling with `&`.
@@ -46,7 +46,7 @@ Do not wait for this long-running command to exit. Keep its process/session hand
 If the target URL is already known, pass it so the managed browser opens there:
 
 ```bash
-d3k --no-agent --no-tui -t --app-url "<url>"
+d3k -t --app-url "<url>"
 ```
 
 Let d3k auto-detect the package manager, dev command, and port. Add `--command`, `--script`, or `--port` only when detection is wrong or the user specified them.
@@ -57,7 +57,7 @@ Let d3k auto-detect the package manager, dev command, and port. Add `--command`,
 d3k status --json
 ```
 
-A successful status response is the readiness boundary. Prefer the reported Portless `appUrl`; the underlying app port may change between runs. If startup fails, inspect the retained process output and `d3k logs --type server`; do not launch a separate dev server.
+A successful status response is the readiness boundary. A Portless `appUrl` must not contain an explicit port; the underlying app port may still change between runs. If `routing` is `direct` because the canonical proxy is unavailable, surface d3k's one-time `d3k portless setup` instruction to the user. If startup fails, inspect the retained process output and `d3k logs --type server`; do not launch a separate dev server.
 
 ## User-Driven Testing
 
@@ -126,3 +126,4 @@ Use `--headless` only for CI or when explicitly requested. Use `--servers-only` 
 - Preserve the project-stable Chrome profile unless the user explicitly asks for a fresh profile.
 - Leave the runtime running when handing a headed browser to the user; stop it only when asked or when the task requires a clean restart.
 - Portless routing is the default. Use `--no-portless` or `PORTLESS=0` only when direct localhost routing is explicitly required.
+- Treat Portless as active only when the reported URL is genuinely port-free. Never describe a URL with an explicit proxy port as Portless routing.

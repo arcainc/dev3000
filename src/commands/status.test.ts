@@ -39,12 +39,12 @@ describe("getD3kStatus", () => {
       projectName: "example",
       pid: 123,
       appPort: "3000",
-      publicUrl: "http://example.localhost:1355",
+      publicUrl: "https://example.localhost",
       sessionFile: "/tmp/session.json",
       lastModified: new Date()
     })
 
-    expect(status.appUrl).toBe("http://example.localhost:1355")
+    expect(status.appUrl).toBe("https://example.localhost")
     expect(status.browserConnected).toBe(false)
   })
 })

@@ -35,10 +35,10 @@ bun install -g dev3000
 
 Use `npm install -g dev3000` only when Bun is unavailable.
 
-3. Start d3k with the agent's shell/process tool as a retained background or yielded session:
+3. Start d3k with the agent's shell/process tool as a retained background or yielded session (non-TUI by default):
 
 ```bash
-d3k --no-agent --no-tui -t
+d3k -t
 ```
 
 Do not wait for this long-running command to exit. Keep its process/session handle so you can monitor or stop it later. Prefer the execution tool's background/session support over shelling with `&`.
@@ -46,7 +46,7 @@ Do not wait for this long-running command to exit. Keep its process/session hand
 If the target URL is already known, pass it so the managed browser opens there:
 
 ```bash
-d3k --no-agent --no-tui -t --app-url "<url>"
+d3k -t --app-url "<url>"
 ```
 
 Let d3k auto-detect the package manager, dev command, and port. Add `--command`, `--script`, or `--port` only when detection is wrong or the user specified them.

@@ -4,7 +4,8 @@ import { homedir } from "os"
 import { dirname, join } from "path"
 import { fileURLToPath } from "url"
 
-const SAFE_PROXY_PORT = 1355
+const CANONICAL_PROXY_PORT = 443
+const PORTLESS_SETUP_HINT = "Run `d3k portless setup` once, or run `portless proxy start --port 443` interactively."
 
 export interface PortlessRuntime {
   name: string
@@ -133,6 +134,21 @@ export function parsePortlessUrl(output: string): string | null {
   return output.match(/https?:\/\/[^\s]+/)?.[0] || null
 }
 
+export function isCanonicalPortlessUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return false
+    }
+
+    // URL normalizes explicit default ports away, so inspect the original
+    // authority to ensure the user-facing URL truly contains no port number.
+    return !/^https?:\/\/(?:\[[^\]]+\]|[^/?#:]+):\d+(?:[/?#]|$)/i.test(url)
+  } catch {
+    return false
+  }
+}
+
 function getPortlessUrl(name: string): string | null {
   const result = runPortlessCommand(["get", name], 5000)
   return result.success ? parsePortlessUrl(result.output) : null
@@ -141,6 +157,25 @@ function getPortlessUrl(name: string): string | null {
 function isProxyRunning(): boolean {
   const result = runPortlessCommand(["doctor"], 10000)
   return /ok\s+Proxy is running\b/i.test(result.output)
+}
+
+function canStartCanonicalProxyNonInteractively(): boolean {
+  if (process.platform !== "darwin" && process.platform !== "linux") {
+    return true
+  }
+  if (process.getuid?.() === 0) {
+    return true
+  }
+
+  try {
+    const result = spawnSync("sudo", ["-n", "true"], {
+      stdio: "ignore",
+      timeout: 2000
+    })
+    return result.status === 0
+  } catch {
+    return false
+  }
 }
 
 export function preparePortlessRuntime(name: string): PortlessRuntimeResult {
@@ -153,16 +188,22 @@ export function preparePortlessRuntime(name: string): PortlessRuntimeResult {
   }
 
   if (!isProxyRunning()) {
-    // Never try the privileged HTTPS default from an agent-owned process.
-    // sudo may read directly from /dev/tty even when the child stdio is piped,
-    // which would hang startup on a password prompt. Existing running proxies
-    // retain their configured HTTPS/TLD behavior; fresh starts use safe HTTP.
-    const startResult = runPortlessCommand(["proxy", "start", "--port", String(SAFE_PROXY_PORT), "--no-tls"])
+    if (!canStartCanonicalProxyNonInteractively()) {
+      return {
+        success: false,
+        error: `A port-free Portless proxy requires one-time setup. ${PORTLESS_SETUP_HINT}`
+      }
+    }
+
+    // Requiring the canonical proxy port prevents Portless from silently
+    // falling back to :1355 when elevation is unavailable. Piped stdio keeps
+    // agent-owned startup non-interactive; users can perform setup once.
+    const startResult = runPortlessCommand(["proxy", "start", "--port", String(CANONICAL_PROXY_PORT)])
 
     if (!startResult.success) {
       return {
         success: false,
-        error: startResult.output || "Failed to start the Portless proxy"
+        error: `A port-free Portless proxy is not available. ${PORTLESS_SETUP_HINT}`
       }
     }
   }
@@ -170,6 +211,13 @@ export function preparePortlessRuntime(name: string): PortlessRuntimeResult {
   const url = getPortlessUrl(name)
   if (!url) {
     return { success: false, error: "Portless did not return a URL" }
+  }
+
+  if (!isCanonicalPortlessUrl(url)) {
+    return {
+      success: false,
+      error: `Portless returned ${url}, which includes an explicit port. ${PORTLESS_SETUP_HINT}`
+    }
   }
 
   return {

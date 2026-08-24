@@ -43,7 +43,7 @@ The skill teaches agents to start d3k non-interactively, retain the background p
 When you ask to use d3k, the agent should:
 
 1. Run `d3k status --json` and reuse an active project session.
-2. Start `d3k --no-agent --no-tui -t` in a retained background tool session when needed.
+2. Start `d3k -t` in a retained background tool session when needed.
 3. Wait for d3k to report a ready Portless URL and managed browser.
 4. Either hand the headed browser to you or drive it with `d3k agent-browser`, depending on your request.
 5. Read `d3k errors --context` and the unified logs after reproduction.
@@ -63,8 +63,8 @@ That gives the user one stable URL, one browser, one evidence stream, and one de
 # Is this project's runtime ready?
 d3k status --json
 
-# Start the runtime manually in agent-safe mode
-d3k --no-agent --no-tui -t
+# Start the runtime manually in agent-safe mode (non-TUI default)
+d3k -t
 
 # Inspect unified evidence
 d3k errors --context
@@ -81,7 +81,7 @@ d3k agent-browser --require-d3k-browser open http://localhost:3000
 
 Do not run `npm run dev` or `bun run dev` alongside d3k. d3k is the dev-server owner for the session.
 
-Portless is automatic. Use `--no-portless` or `PORTLESS=0` only when direct localhost routing is specifically required. If Portless cannot initialize, d3k falls back to localhost instead of blocking startup.
+Portless is automatic and only counts as active when it provides a genuinely port-free URL such as `https://my-app.localhost`. Clean URLs require one-time privileged proxy setup; run `d3k portless setup` once so the HTTPS proxy starts on port 443 at boot. If that setup is unavailable, d3k prints the setup command and falls back to direct localhost instead of silently using a URL with an explicit proxy port. Use `--no-portless` or `PORTLESS=0` only when direct localhost routing is specifically required.
 
 ## Why the Managed Browser Matters
 
@@ -145,7 +145,7 @@ d3k --help
 | `--no-portless` | Disable the default stable Portless URL |
 | `--headless` | Run Chrome headlessly for CI |
 | `--servers-only` | Intentionally disable browser monitoring |
-| `--no-tui` | Disable the interactive dashboard |
+| `--tui` | Enable the interactive dashboard (off by default) |
 | `--no-agent` | Skip the standalone agent-selection prompt |
 | `-t, --tail` | Stream the consolidated log |
 | `--debug` | Print verbose runtime diagnostics |
@@ -185,7 +185,7 @@ d3k detects common web projects, including:
 Use d3k itself as the local runtime for this repository:
 
 ```bash
-d3k --no-agent --no-tui -t
+d3k -t
 ```
 
 After code changes:

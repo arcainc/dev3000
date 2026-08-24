@@ -120,7 +120,7 @@ function printUnsafeAgentBrowserOpenError(reason: string, hasActiveSession: bool
       sessionHint,
       "",
       "For OAuth/auth debugging, start d3k normally so it launches the app and browser together:",
-      '  d3k --no-agent --command "<dev command>" --port <port> --startup-timeout <seconds> --no-tui --app-url "<url>"',
+      '  d3k --command "<dev command>" --port <port> --startup-timeout <seconds> --app-url "<url>"',
       "",
       "Then navigate the d3k-managed browser with:",
       '  d3k agent-browser --require-d3k-browser open "<url>"',
@@ -245,6 +245,7 @@ import { dirname, join, resolve } from "path"
 import { fileURLToPath } from "url"
 import { runRemoteSkillCommand, shouldUseRemoteSkillRunner } from "./commands/skill-runner.js"
 import { createPersistentLogFile, findAvailablePort, startDevEnvironment } from "./dev-environment.js"
+import { getPortlessCommand } from "./portless.js"
 import { getBundledD3kSkillPath, getSkill, getSkillsInfo, listAvailableSkills } from "./skills/index.js"
 import { detectAIAgent } from "./utils/agent-detection.js"
 import { getAvailableAgents, getSkillsAgentId } from "./utils/agent-selection.js"
@@ -954,7 +955,7 @@ program
   .option("--servers-only", "Run servers only, skip browser launch")
   .option("--debug", "Enable debug logging to console (automatically disables TUI)")
   .option("-t, --tail", "Output consolidated logfile to terminal (like tail -f)")
-  .option("--no-tui", "Disable TUI mode and use standard terminal output")
+  .option("--tui", "Enable the interactive TUI dashboard (off by default)", false)
   .option("--portless", "Use stable Portless URLs (default)", true)
   .option("--no-portless", "Use a direct localhost URL instead of Portless")
   .option(
@@ -1035,8 +1036,8 @@ program
       })
       return
     }
-    // Handle agent selection for split-screen mode (default behavior in TTY)
-    // Skip if --no-agent, --no-tui, --debug flags are used, or if already inside tmux (to avoid nested prompts)
+    // Handle agent selection for split-screen mode (explicit with --tui)
+    // Skip unless --tui is provided, or if already inside tmux (to avoid nested prompts)
     const insideTmux = !!process.env.TMUX
     let selectedAgent: { name: string; command: string } | null = null
     let didPromptAgentSelection = false
@@ -1045,7 +1046,7 @@ program
       : agentDetection.agentId || null
 
     if (agentDetection.isAgent) {
-      if (options.tui !== false) {
+      if (options.tui) {
         if (options.debug) {
           console.log(
             `[DEBUG] AI agent detected: ${agentDetection.agentName} (${agentDetection.reason}), auto-disabling TUI`
@@ -1064,7 +1065,7 @@ program
       }
     }
 
-    if (process.stdin.isTTY && options.agent !== false && options.tui !== false && !options.debug && !insideTmux) {
+    if (process.stdin.isTTY && options.agent !== false && options.tui === true && !options.debug && !insideTmux) {
       // Clear the terminal so d3k UI starts at the top of the screen
       process.stdout.write("\x1B[2J\x1B[0f")
 
@@ -1385,7 +1386,8 @@ program
         startupTimeoutSeconds,
         browserNavigationTimeoutSeconds,
         tail: options.tail,
-        tui: options.tui && !options.debug, // TUI is default unless --no-tui or --debug is specified
+        // TUI is opt-in now; only enable when explicitly requested and not in debug
+        tui: options.tui === true && !options.debug,
         portless: options.portless !== false && process.env.PORTLESS !== "0",
         customServerCommand: Boolean(options.command),
         dateTimeFormat: options.dateTime || "local",
@@ -1400,6 +1402,25 @@ program
       console.error(chalk.red("❌ Failed to start development environment:"), error)
       process.exit(1)
     }
+  })
+
+const portlessCommand = program.command("portless").description("Set up the canonical port-free Portless proxy")
+
+portlessCommand
+  .command("setup")
+  .description("Install the HTTPS Portless proxy as an OS startup service on port 443")
+  .action(() => {
+    console.log(chalk.cyan("Installing the Portless HTTPS service on port 443..."))
+    const result = spawnSync(getPortlessCommand(), ["service", "install", "--port", "443"], {
+      stdio: "inherit"
+    })
+
+    if (result.status !== 0) {
+      console.error(chalk.red("Portless service setup failed."))
+      process.exit(result.status ?? 1)
+    }
+
+    console.log(chalk.green("Portless is ready. d3k will now use URLs such as https://my-app.localhost."))
   })
 
 // Upgrade command

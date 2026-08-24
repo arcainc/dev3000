@@ -5,12 +5,12 @@ This file is the source of truth for agent guidance in this repo. `CLAUDE.md` is
 ## Runtime
 
 - Use `d3k` as the default local runtime.
-- Portless stable URLs are enabled by default. Use the `appUrl` from `d3k status --json`; do not assume a localhost port.
+- Portless URLs are enabled by default and must be genuinely port-free (for example, `https://my-app.localhost`). Use the `appUrl` from `d3k status --json`; if routing falls back to direct localhost, surface d3k's one-time `d3k portless setup` instruction to the user.
 - When the user asks to use, test, debug, or develop with d3k, start it in a retained background tool session. Do not make the user launch it or switch to the TUI.
 - Do not run `bun run dev` or `bun run build` for `www/`.
 - Start d3k with:
   ```bash
-  d3k --no-agent --no-tui -t
+  d3k -t
   ```
 - Primary debugging commands:
   ```bash

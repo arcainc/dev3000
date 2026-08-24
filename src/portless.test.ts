@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { buildPortlessServerCommand, type PortlessRuntime, parsePortlessUrl } from "./portless"
+import { buildPortlessServerCommand, isCanonicalPortlessUrl, type PortlessRuntime, parsePortlessUrl } from "./portless"
 
 const runtime: PortlessRuntime = {
   name: "example-app",
-  url: "http://example-app.localhost:1355",
+  url: "https://example-app.localhost",
   command: "/usr/local/bin/portless"
 }
 
@@ -11,6 +11,14 @@ describe("Portless integration", () => {
   it("extracts the canonical URL from Portless output", () => {
     expect(parsePortlessUrl("service URL: https://example.localhost\n")).toBe("https://example.localhost")
     expect(parsePortlessUrl("no URL here")).toBeNull()
+  })
+
+  it("only accepts genuinely port-free URLs as canonical", () => {
+    expect(isCanonicalPortlessUrl("https://example.localhost")).toBe(true)
+    expect(isCanonicalPortlessUrl("http://example.localhost")).toBe(true)
+    expect(isCanonicalPortlessUrl("https://example.localhost:443")).toBe(false)
+    expect(isCanonicalPortlessUrl("http://example.localhost:1355")).toBe(false)
+    expect(isCanonicalPortlessUrl("not a URL")).toBe(false)
   })
 
   it("wraps detected server commands with Portless", () => {
