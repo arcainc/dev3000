@@ -22,6 +22,6 @@ export async function GET(request: Request) {
 }
 
 function getSafeNextPath(value: string | null): string | null {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return null
+  if (!value?.startsWith("/") || value.startsWith("//")) return null
   return value
 }

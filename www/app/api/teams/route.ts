@@ -1,3 +1,4 @@
+import { connection } from "next/server"
 import { listCurrentUserTeams } from "@/lib/vercel-teams"
 
 /**
@@ -6,6 +7,8 @@ import { listCurrentUserTeams } from "@/lib/vercel-teams"
  * Returns all teams the user has access to, including their personal account.
  */
 export async function GET() {
+  await connection()
+
   try {
     const teams = await listCurrentUserTeams()
 

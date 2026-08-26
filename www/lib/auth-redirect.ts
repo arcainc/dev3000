@@ -7,7 +7,7 @@ interface AuthRedirectOptions {
 }
 
 export function sanitizeAuthRedirectPath(nextPath: string | null | undefined): string {
-  if (!nextPath || !nextPath.startsWith("/") || nextPath.startsWith("//")) {
+  if (!nextPath?.startsWith("/") || nextPath.startsWith("//")) {
     return DEFAULT_AUTH_REDIRECT
   }
 

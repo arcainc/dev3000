@@ -10,5 +10,6 @@ minimumReleaseAgeExcludes = [
   "@vercel/sdk",
   "@vercel/speed-insights",
   "@workflow/world-vercel",
+  "@workflow/world",
   "turbo",
 ]

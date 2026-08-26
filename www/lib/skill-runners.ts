@@ -223,7 +223,7 @@ async function readJsonBlob<T>(pathname: string): Promise<T | null> {
     }
 
     const privateBlob = await get(pathname, { access: "private", useCache: false })
-    if (!privateBlob || privateBlob.statusCode !== 200) return null
+    if (privateBlob?.statusCode !== 200) return null
     return (await new Response(privateBlob.stream).json()) as T
   } catch {
     return null
@@ -241,7 +241,7 @@ async function listSkillRunnerUsageStats(): Promise<Map<string, SkillRunnerUsage
         }
 
         const privateBlob = await get(blob.pathname, { access: "private" })
-        if (!privateBlob || privateBlob.statusCode !== 200) return null
+        if (privateBlob?.statusCode !== 200) return null
         return (await new Response(privateBlob.stream).json()) as SkillRunnerUsageStat
       })
     )

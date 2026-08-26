@@ -1211,7 +1211,7 @@ export class CDPMonitor {
     }
 
     const snapshot = await this.getReactDebugSnapshot()
-    if (!snapshot || !snapshot.hookPresent) {
+    if (!snapshot?.hookPresent) {
       return
     }
 

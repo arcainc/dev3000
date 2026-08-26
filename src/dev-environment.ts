@@ -1880,7 +1880,7 @@ export class DevEnvironment {
     }
   }
 
-  private debugLog(message: string) {
+  private debugLog = (message: string) => {
     const timestamp = formatTimestamp(new Date(), this.options.dateTimeFormat || "local")
 
     if (this.options.debug) {

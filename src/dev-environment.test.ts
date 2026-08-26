@@ -868,6 +868,37 @@ describe("DevEnvironment log initialization", () => {
       rmSync(tempDir, { recursive: true, force: true })
     }
   })
+
+  it("keeps debug logging bound when passed to skill installation callbacks", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "d3k-dev-env-debug-log-"))
+    const originalDataDir = process.env.D3K_DATA_DIR
+    try {
+      process.env.D3K_DATA_DIR = join(tempDir, "data")
+      const environment = new DevEnvironment({
+        port: "3000",
+        serverCommand: "echo ready",
+        startupTimeoutSeconds: 1,
+        browserNavigationTimeoutSeconds: 1,
+        profileDir: join(tempDir, "profile"),
+        browserTool: "agent-browser",
+        logFile: join(tempDir, "session.log"),
+        commandName: "d3k",
+        tui: false,
+        serversOnly: true,
+        portless: false
+      })
+      const detachedDebugLog = (environment as unknown as { debugLog: (message: string) => void }).debugLog
+
+      expect(() => detachedDebugLog("Auto-installing skill package: test/package")).not.toThrow()
+    } finally {
+      if (originalDataDir === undefined) {
+        delete process.env.D3K_DATA_DIR
+      } else {
+        process.env.D3K_DATA_DIR = originalDataDir
+      }
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe("d3k lock validation", () => {

@@ -7,7 +7,7 @@ import type { LogFormatParser, ParsedLogLine } from "./base.js"
 
 export class StandardLogParser implements LogFormatParser {
   parse(text: string): ParsedLogLine[] {
-    if (!text || !text.trim()) {
+    if (!text?.trim()) {
       return []
     }
 

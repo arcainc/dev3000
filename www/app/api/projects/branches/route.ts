@@ -1,3 +1,4 @@
+import { connection } from "next/server"
 import { getVercelApiAccessToken } from "@/lib/auth"
 
 /**
@@ -9,6 +10,8 @@ import { getVercelApiAccessToken } from "@/lib/auth"
  * - limit: Number of deployments to check (default: 20)
  */
 export async function GET(request: Request) {
+  await connection()
+
   try {
     const accessToken = await getVercelApiAccessToken()
 

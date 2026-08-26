@@ -417,7 +417,7 @@ function isRecoverableBrowserError(error: string | undefined): boolean {
  * Uses agent-browser CLI for browser automation (preferred over CDP in cloud)
  */
 async function getAgentBrowser(sandbox: Sandbox, debug = false): Promise<SandboxAgentBrowser> {
-  const cacheKey = sandbox.sandboxId
+  const cacheKey = sandbox.name
   let browser = agentBrowserCache.get(cacheKey)
   if (!browser) {
     const nextVersion = (agentBrowserProfileVersion.get(cacheKey) || 0) + 1
@@ -454,7 +454,7 @@ async function navigateBrowser(
     workflowLog(`[Browser] ${browserMode} navigation failed: ${result.error}`)
     if (isRecoverableBrowserError(result.error)) {
       workflowLog(`[Browser] Resetting cached ${browserMode} instance after recoverable navigation failure`)
-      agentBrowserCache.delete(sandbox.sandboxId)
+      agentBrowserCache.delete(sandbox.name)
       const retryBrowser = await getAgentBrowser(sandbox, debug)
       const retryResult = await retryBrowser.open(url, timeoutMs ? { timeout: timeoutMs } : undefined)
       if (retryResult.success) {
@@ -466,7 +466,7 @@ async function navigateBrowser(
   } catch (error) {
     workflowLog(`[Browser] ${browserMode} error: ${error instanceof Error ? error.message : String(error)}`)
     if (isRecoverableBrowserError(error instanceof Error ? error.message : String(error))) {
-      agentBrowserCache.delete(sandbox.sandboxId)
+      agentBrowserCache.delete(sandbox.name)
     }
   }
 
@@ -492,7 +492,7 @@ async function reloadBrowser(
     workflowLog(`[Browser] ${browserMode} reload failed: ${result.error}`)
     if (isRecoverableBrowserError(result.error)) {
       workflowLog(`[Browser] Resetting cached ${browserMode} instance after recoverable reload failure`)
-      agentBrowserCache.delete(sandbox.sandboxId)
+      agentBrowserCache.delete(sandbox.name)
       const retryBrowser = await getAgentBrowser(sandbox, debug)
       const retryResult = await retryBrowser.reload(timeoutMs ? { timeout: timeoutMs } : undefined)
       if (retryResult.success) {
@@ -504,7 +504,7 @@ async function reloadBrowser(
   } catch (error) {
     workflowLog(`[Browser] ${browserMode} error: ${error instanceof Error ? error.message : String(error)}`)
     if (isRecoverableBrowserError(error instanceof Error ? error.message : String(error))) {
-      agentBrowserCache.delete(sandbox.sandboxId)
+      agentBrowserCache.delete(sandbox.name)
     }
   }
 
@@ -529,7 +529,7 @@ async function evaluateInBrowser(
     }
     if (isRecoverableBrowserError(result.error)) {
       workflowLog(`[Browser] Resetting cached ${browserMode} instance after recoverable evaluate failure`)
-      agentBrowserCache.delete(sandbox.sandboxId)
+      agentBrowserCache.delete(sandbox.name)
       const retryBrowser = await getAgentBrowser(sandbox, debug)
       const retryResult = await retryBrowser.evaluate(expression, timeoutMs ? { timeout: timeoutMs } : undefined)
       if (retryResult.success) {
@@ -540,7 +540,7 @@ async function evaluateInBrowser(
     return { success: false, error: result.error }
   } catch (error) {
     if (isRecoverableBrowserError(error instanceof Error ? error.message : String(error))) {
-      agentBrowserCache.delete(sandbox.sandboxId)
+      agentBrowserCache.delete(sandbox.name)
     }
     return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
@@ -1715,7 +1715,7 @@ async function getRunningSandboxWithRetry(
     for (const credentialAttempt of credentialAttempts) {
       try {
         const sandbox = await Sandbox.get({
-          sandboxId,
+          name: sandboxId,
           ...formatSandboxCredentialAttempt(credentialAttempt)
         })
         if (sandbox.status !== "running") {
@@ -2876,7 +2876,7 @@ export async function initSandboxStep(
     throw error
   }
 
-  workflowLog(`[Init] Sandbox: ${sandboxResult.sandbox.sandboxId}`)
+  workflowLog(`[Init] Sandbox: ${sandboxResult.sandbox.name}`)
   workflowLog(`[Init] Dev URL: ${sandboxResult.devUrl}`)
   workflowLog(`[Init] From base snapshot: ${sandboxResult.fromSnapshot}`)
   await updateProgress(
@@ -2944,7 +2944,7 @@ export async function initSandboxStep(
     }
 
     return {
-      sandboxId: sandboxResult.sandbox.sandboxId,
+      sandboxId: sandboxResult.sandbox.name,
       devUrl: sandboxResult.devUrl,
       reportId,
       beforeCls: null,
@@ -2978,7 +2978,7 @@ export async function initSandboxStep(
     }
 
     return {
-      sandboxId: sandboxResult.sandbox.sandboxId,
+      sandboxId: sandboxResult.sandbox.name,
       devUrl: sandboxResult.devUrl,
       reportId,
       beforeCls: null,
@@ -3050,7 +3050,7 @@ export async function initSandboxStep(
   }
 
   return {
-    sandboxId: sandboxResult.sandbox.sandboxId,
+    sandboxId: sandboxResult.sandbox.name,
     devUrl: sandboxResult.devUrl,
     reportId,
     beforeCls: clsData.clsScore,
@@ -3530,9 +3530,9 @@ export async function observeBaselineStep(
       throw freshSandboxError
     }
     sandbox = freshResult.sandbox
-    sandboxId = sandbox.sandboxId
-    await appendProgressLog(progressContext, `[Observe] Fresh sandbox ready: ${sandbox.sandboxId}`)
-    workflowLog(`[Observe] Fresh sandbox created: ${sandbox.sandboxId}`)
+    sandboxId = sandbox.name
+    await appendProgressLog(progressContext, `[Observe] Fresh sandbox ready: ${sandbox.name}`)
+    workflowLog(`[Observe] Fresh sandbox created: ${sandbox.name}`)
   }
 
   const installedSkillNames = await installDevAgentSkillsInSandbox(
@@ -5138,7 +5138,7 @@ async function reconnectDeepSecSandbox(
       params.progressContext,
       "agent"
     )
-    await appendProgressLog(params.progressContext, `[Agent] Fresh sandbox ready: ${freshResult.sandbox.sandboxId}`)
+    await appendProgressLog(params.progressContext, `[Agent] Fresh sandbox ready: ${freshResult.sandbox.name}`)
     return {
       sandbox: freshResult.sandbox,
       recreatedSandbox: true,
@@ -5201,7 +5201,7 @@ export async function deepSecPrepareStep(params: DeepSecStepParams): Promise<Dee
 
   const timing = timer.getData()
   return {
-    sandboxId: sandbox.sandboxId,
+    sandboxId: sandbox.name,
     sandboxProjectId,
     sandboxTeamId,
     projectDir: effectiveProjectDir,
@@ -5819,7 +5819,7 @@ export async function deepSecFinalizePartialStep(
   timer.end()
 
   return {
-    sandboxId: sandbox.sandboxId,
+    sandboxId: sandbox.name,
     reportBlobUrl: blob.appUrl,
     reportId: params.reportId,
     beforeCls: null,
@@ -6014,7 +6014,7 @@ export async function deepSecFinalizeStep(
   timer.end()
 
   return {
-    sandboxId: sandbox.sandboxId,
+    sandboxId: sandbox.name,
     reportBlobUrl: blob.appUrl,
     reportId: params.reportId,
     beforeCls: null,
@@ -6159,8 +6159,8 @@ export async function agentFixLoopStep(
     }
     sandbox = freshResult.sandbox
     recreatedSandbox = true
-    await appendProgressLog(progressContext, `[Agent] Fresh sandbox ready: ${sandbox.sandboxId}`)
-    workflowLog(`[Agent] Fresh sandbox created: ${sandbox.sandboxId}`)
+    await appendProgressLog(progressContext, `[Agent] Fresh sandbox ready: ${sandbox.name}`)
+    workflowLog(`[Agent] Fresh sandbox created: ${sandbox.name}`)
   }
 
   const effectiveProjectDir = isTurbopackBundleAnalyzer
@@ -6753,7 +6753,7 @@ Did the agent meet the success criteria? Respond with JSON only.`
   }
 
   return {
-    sandboxId: sandbox.sandboxId,
+    sandboxId: sandbox.name,
     reportBlobUrl: blob.appUrl,
     reportId,
     beforeCls: effectiveBeforeClsScore,
@@ -6794,7 +6794,7 @@ export async function urlAuditStep(
   timer.start("Reconnect to sandbox")
   await updateProgress(progressContext, 2, "Launching external URL audit...", targetUrl)
 
-  const sandbox = await Sandbox.get({ sandboxId })
+  const sandbox = await Sandbox.get({ name: sandboxId })
   if (sandbox.status !== "running") {
     throw new Error(`Sandbox not running: ${sandbox.status}`)
   }
@@ -11959,7 +11959,7 @@ async function fetchWebVitalsViaCDP(
 export async function cleanupSandbox(sandboxId: string): Promise<void> {
   workflowLog(`[Cleanup] Stopping sandbox ${sandboxId}`)
   try {
-    const sandbox = await Sandbox.get({ sandboxId })
+    const sandbox = await Sandbox.get({ name: sandboxId })
     await sandbox.stop()
     workflowLog("[Cleanup] Sandbox stopped")
   } catch (err) {
@@ -12000,7 +12000,7 @@ export async function createPullRequestStep(
   try {
     timer.start("Get sandbox")
     workflowLog(`[PR] Getting sandbox ${sandboxId}...`)
-    const sandbox = await Sandbox.get({ sandboxId })
+    const sandbox = await Sandbox.get({ name: sandboxId })
     workflowLog(`[PR] Sandbox status: ${sandbox.status}`)
     if (sandbox.status !== "running") {
       throw new Error(`Sandbox not running: ${sandbox.status}`)
@@ -12312,7 +12312,7 @@ export async function captureScreenshotsForPRStep(
 
   try {
     // Get sandbox
-    const sandbox = await Sandbox.get({ sandboxId })
+    const sandbox = await Sandbox.get({ name: sandboxId })
     if (sandbox.status !== "running") {
       workflowLog(`[Screenshots] Sandbox not running: ${sandbox.status}`)
       return []

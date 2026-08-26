@@ -1,3 +1,4 @@
+import { connection } from "next/server"
 import { getVercelApiAccessToken } from "@/lib/auth"
 
 interface VercelProjectsResponse {
@@ -111,6 +112,8 @@ async function fetchProjects(
  * - all: Set to 1 to paginate through up to 20 pages. Omit for picker-friendly bounded fetches.
  */
 export async function GET(request: Request) {
+  await connection()
+
   try {
     const accessToken = await getVercelApiAccessToken()
 

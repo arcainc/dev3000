@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { connection, type NextRequest, NextResponse } from "next/server"
 import { sanitizeAuthRedirectPath } from "@/lib/auth-redirect"
 
 interface TokenData {
@@ -11,6 +11,8 @@ interface TokenData {
 }
 
 export async function GET(request: NextRequest) {
+  await connection()
+
   try {
     const url = new URL(request.url)
     const code = url.searchParams.get("code")

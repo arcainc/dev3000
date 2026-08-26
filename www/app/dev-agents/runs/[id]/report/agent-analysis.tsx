@@ -1,6 +1,6 @@
 "use client"
 
-import { ComarkClient } from "@comark/react"
+import { MarkdownClient } from "@comark/react"
 import security from "@comark/react/plugins/security"
 import { textContent, visit } from "@comark/react/utils"
 import { ChevronDown, ChevronRight } from "lucide-react"
@@ -518,10 +518,10 @@ export function AgentAnalysis({
   if (!parsed.finalOutput && parsed.steps.length === 0) {
     return (
       <div className={analysisClassName}>
-        <ComarkClient
+        <MarkdownClient
           className="space-y-4 whitespace-normal *:first:mt-0 *:last:mb-0"
           components={markdownComponents}
-          markdown={normalizedRawContent}
+          value={normalizedRawContent}
           options={COMARK_OPTIONS}
           plugins={COMARK_PLUGINS}
         />
@@ -534,10 +534,10 @@ export function AgentAnalysis({
       {/* Final Output - shown prominently at the top (with Git Diff section stripped) */}
       {cleanedFinalOutput && (
         <div className={analysisClassName}>
-          <ComarkClient
+          <MarkdownClient
             className="space-y-4 whitespace-normal *:first:mt-0 *:last:mb-0"
             components={markdownComponents}
-            markdown={cleanedFinalOutput}
+            value={cleanedFinalOutput}
             options={COMARK_OPTIONS}
             plugins={COMARK_PLUGINS}
           />
@@ -569,10 +569,10 @@ export function AgentAnalysis({
                           <div>
                             <div className="text-xs font-medium text-muted-foreground mb-1">Assistant</div>
                             <div className={analysisClassName}>
-                              <ComarkClient
+                              <MarkdownClient
                                 className="space-y-4 whitespace-normal *:first:mt-0 *:last:mb-0"
                                 components={markdownComponents}
-                                markdown={normalizeReportMarkdown(step.assistantText)}
+                                value={normalizeReportMarkdown(step.assistantText)}
                                 options={COMARK_OPTIONS}
                                 plugins={COMARK_PLUGINS}
                               />

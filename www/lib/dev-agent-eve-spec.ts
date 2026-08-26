@@ -1112,7 +1112,7 @@ async function resolvePackagedSkillFiles(
     let resolvedDir: string | null = null
     for (const candidate of candidateDirs) {
       try {
-        const entries = await readdir(candidate)
+        const entries = await readdir(/* turbopackIgnore: true */ candidate)
         if (entries.length > 0) {
           resolvedDir = candidate
           break
