@@ -42,12 +42,13 @@ The skill teaches agents to start d3k non-interactively, retain the background p
 
 When you ask to use d3k, the agent should:
 
-1. Run `d3k status --json` and reuse an active project session.
-2. Start `d3k -t` in a retained background tool session when needed.
-3. Wait for d3k to report a ready Portless URL and managed browser.
-4. Either hand the headed browser to you or drive it with `d3k agent-browser`, depending on your request.
-5. Read `d3k errors --context` and the unified logs after reproduction.
-6. Keep the same runtime and project-stable Chrome profile alive across edits and retests.
+1. Run `d3k portless status --json` and complete `d3k portless setup` if required.
+2. Run `d3k status --json` and reuse only a ready Portless project session.
+3. Start `d3k -t` in a retained background tool session when needed.
+4. Wait for d3k to report a port-free HTTPS URL and managed browser.
+5. Either hand the headed browser to you or drive it with `d3k agent-browser`, depending on your request.
+6. Read `d3k errors --context` and the unified logs after reproduction.
+7. Keep the same runtime and project-stable Chrome profile alive across edits and retests.
 
 That gives the user one stable URL, one browser, one evidence stream, and one dev server.
 
@@ -63,6 +64,9 @@ That gives the user one stable URL, one browser, one evidence stream, and one de
 # Is this project's runtime ready?
 d3k status --json
 
+# Is canonical Portless HTTPS ready?
+d3k portless status --json
+
 # Start the runtime manually in agent-safe mode (non-TUI default)
 d3k -t
 
@@ -76,12 +80,12 @@ d3k logs --type server
 d3k agent-browser snapshot -i
 d3k agent-browser click @e2
 d3k agent-browser fill @e3 "text"
-d3k agent-browser --require-d3k-browser open http://localhost:3000
+d3k agent-browser --require-d3k-browser open https://my-app.localhost
 ```
 
 Do not run `npm run dev` or `bun run dev` alongside d3k. d3k is the dev-server owner for the session.
 
-Portless is automatic and only counts as active when it provides a genuinely port-free URL such as `https://my-app.localhost`. Clean URLs require one-time privileged proxy setup; run `d3k portless setup` once so the HTTPS proxy starts on port 443 at boot. If that setup is unavailable, d3k prints the setup command and falls back to direct localhost instead of silently using a URL with an explicit proxy port. Use `--no-portless` or `PORTLESS=0` only when direct localhost routing is specifically required.
+Portless is required by default and only counts as ready when it provides a genuinely port-free URL such as `https://my-app.localhost`. `d3k portless setup` performs one-time administrator authorization to generate/trust the local HTTPS CA and install a root-owned startup service on port 443. After setup, every d3k server registers behind that proxy and the managed browser opens the Portless URL. d3k fails before starting the app when canonical Portless is unavailable; use `--no-portless` only when direct localhost routing is specifically required.
 
 ## Why the Managed Browser Matters
 

@@ -19,15 +19,29 @@ When this skill triggers, operate d3k. Do not merely tell the user how to run it
 
 Run from the project root.
 
-1. Check for an existing project runtime:
+1. Check canonical Portless readiness before starting any app process:
+
+```bash
+d3k portless status --json
+```
+
+If `"setupRequired": true`, run:
+
+```bash
+d3k portless setup
+```
+
+On macOS this opens the system administrator authorization dialog. Wait for the user to approve it, then rerun `d3k portless status --json`. Do not start d3k until `"canonical": true`, `"serviceInstalled": true`, and `"setupRequired": false`. If authorization is declined or unavailable, stop and explain the blocker. Never silently substitute direct localhost.
+
+2. Check for an existing project runtime:
 
 ```bash
 d3k status --json
 ```
 
-If it reports `"running": true`, reuse it. Do not start a second dev server or browser.
+Reuse it only if it reports `"running": true`, `"ready": true`, `"routing": "portless"`, `"browserConnected": true`, and a genuinely port-free `https://...localhost` `appUrl`. If an active session reports `"routing": "direct"`, stop that retained d3k session and restart after Portless is ready. Do not start a second dev server or browser.
 
-2. If d3k is not installed, install it:
+3. If d3k is not installed, install it:
 
 ```bash
 bun install -g dev3000
@@ -35,7 +49,7 @@ bun install -g dev3000
 
 Use `npm install -g dev3000` only when Bun is unavailable.
 
-3. Start d3k with the agent's shell/process tool as a retained background or yielded session:
+4. Start d3k with the agent's shell/process tool as a retained background or yielded session:
 
 ```bash
 d3k -t
@@ -51,13 +65,13 @@ d3k -t --app-url "<url>"
 
 Let d3k auto-detect the package manager, dev command, and port. Add `--command`, `--script`, or `--port` only when detection is wrong or the user specified them.
 
-4. Poll until the runtime is ready:
+5. Poll until the runtime is ready:
 
 ```bash
 d3k status --json
 ```
 
-A successful status response is the readiness boundary. A Portless `appUrl` must not contain an explicit port; the underlying app port may still change between runs. If `routing` is `direct` because the canonical proxy is unavailable, surface d3k's one-time `d3k portless setup` instruction to the user. If startup fails, inspect the retained process output and `d3k logs --type server`; do not launch a separate dev server.
+A successful status response is the readiness boundary only when it reports `"ready": true`, `"routing": "portless"`, `"browserConnected": true`, and a port-free `https://...localhost` `appUrl`. The underlying app port may still change between runs. If startup fails, inspect the retained process output and `d3k logs --type server`; do not launch a separate dev server.
 
 ## User-Driven Testing
 
@@ -125,5 +139,5 @@ Use `--headless` only for CI or when explicitly requested. Use `--servers-only` 
 - Keep d3k alive across edits and retests.
 - Preserve the project-stable Chrome profile unless the user explicitly asks for a fresh profile.
 - Leave the runtime running when handing a headed browser to the user; stop it only when asked or when the task requires a clean restart.
-- Portless routing is the default. Use `--no-portless` or `PORTLESS=0` only when direct localhost routing is explicitly required.
+- Canonical Portless HTTPS routing is required by default. Never add `--no-portless` or set `PORTLESS=0` unless the user explicitly requests direct localhost routing.
 - Treat Portless as active only when the reported URL is genuinely port-free. Never describe a URL with an explicit proxy port as Portless routing.

@@ -959,7 +959,6 @@ export class DevEnvironment {
   private serverUsesHttps: boolean = false
   private publicAppUrl: string | null = null
   private portlessRuntime: PortlessRuntime | null = null
-  private portlessFallbackReason: string | null = null
   private runtimeReady: boolean = false
 
   /** Returns "https" or "http" based on detected server protocol */
@@ -1050,7 +1049,10 @@ export class DevEnvironment {
         this.portlessRuntime = portless.runtime
         this.publicAppUrl = portless.runtime.url
       } else {
-        this.portlessFallbackReason = portless.error || "Portless initialization failed"
+        const reason = portless.error || "Portless initialization failed"
+        throw new Error(
+          `Canonical Portless routing is required by default. ${reason} To intentionally use direct localhost, pass \`--no-portless\`.`
+        )
       }
     }
 
@@ -1237,14 +1239,6 @@ export class DevEnvironment {
 
     // Check if TUI mode is enabled (default) and stdin supports it
     const canUseTUI = this.options.tui && process.stdin.isTTY
-
-    if (this.portlessFallbackReason) {
-      this.debugLog(`Portless unavailable; using direct localhost: ${this.portlessFallbackReason}`)
-      if (!canUseTUI) {
-        console.warn(chalk.yellow("Portless unavailable; using direct localhost."))
-        console.warn(chalk.gray(this.portlessFallbackReason))
-      }
-    }
 
     if (!canUseTUI && this.options.tui) {
       this.debugLog("TTY not available, falling back to non-TUI mode")

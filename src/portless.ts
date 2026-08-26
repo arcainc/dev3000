@@ -19,6 +19,20 @@ export interface PortlessRuntimeResult {
   error?: string
 }
 
+export interface PortlessProxyStatus {
+  installed: boolean
+  serviceInstalled: boolean
+  proxyRunning: boolean
+  canonical: boolean
+  target: string | null
+  setupRequired: boolean
+}
+
+export interface PortlessSetupResult {
+  success: boolean
+  error?: string
+}
+
 function getRunnablePath(searchPath: string): string | null {
   if (!existsSync(searchPath)) {
     return null
@@ -154,9 +168,110 @@ function getPortlessUrl(name: string): string | null {
   return result.success ? parsePortlessUrl(result.output) : null
 }
 
-function isProxyRunning(): boolean {
-  const result = runPortlessCommand(["doctor"], 10000)
-  return /ok\s+Proxy is running\b/i.test(result.output)
+export function parsePortlessProxyStatus(
+  doctorOutput: string,
+  serviceOutput: string,
+  installed: boolean = true
+): PortlessProxyStatus {
+  const target = doctorOutput.match(/^Proxy target:\s*(https?:\/\/\S+)/im)?.[1] || null
+  const proxyRunning = /ok\s+Proxy is (?:running|responding)\b/i.test(doctorOutput)
+  const serviceInstalled = /Installed:\s*yes\b/i.test(serviceOutput)
+  let canonical = false
+
+  if (proxyRunning && target) {
+    try {
+      const parsed = new URL(target)
+      canonical = parsed.protocol === "https:" && (parsed.port === "" || parsed.port === String(CANONICAL_PROXY_PORT))
+    } catch {
+      canonical = false
+    }
+  }
+
+  return {
+    installed,
+    serviceInstalled,
+    proxyRunning,
+    canonical,
+    target,
+    setupRequired: !installed || !canonical || !serviceInstalled
+  }
+}
+
+export function getPortlessProxyStatus(): PortlessProxyStatus {
+  const installed = isPortlessInstalled()
+  if (!installed) {
+    return {
+      installed: false,
+      serviceInstalled: false,
+      proxyRunning: false,
+      canonical: false,
+      target: null,
+      setupRequired: true
+    }
+  }
+
+  const doctor = runPortlessCommand(["doctor"], 10000)
+  const service = runPortlessCommand(["service", "status"], 10000)
+  return parsePortlessProxyStatus(doctor.output, service.output, true)
+}
+
+export async function installPortlessService(): Promise<PortlessSetupResult> {
+  const existingStatus = getPortlessProxyStatus()
+  if (!existingStatus.setupRequired) {
+    return { success: true }
+  }
+
+  const portlessCommand = getPortlessCommand()
+  let result: ReturnType<typeof spawnSync>
+
+  if (process.platform === "darwin" && process.getuid?.() !== 0) {
+    const path = process.env.PATH || "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    const username = process.env.USER || process.env.LOGNAME
+    const uid = process.getuid?.()
+    const gid = process.getgid?.()
+    const command = [
+      "env",
+      `HOME=${shellQuote(homedir())}`,
+      `PATH=${shellQuote(path)}`,
+      ...(username ? [`SUDO_USER=${shellQuote(username)}`] : []),
+      ...(uid !== undefined ? [`SUDO_UID=${uid}`] : []),
+      ...(gid !== undefined ? [`SUDO_GID=${gid}`] : []),
+      shellQuote(portlessCommand),
+      "service",
+      "install",
+      "--port",
+      String(CANONICAL_PROXY_PORT)
+    ].join(" ")
+    const appleScript = `do shell script ${JSON.stringify(command)} with administrator privileges`
+    result = spawnSync("osascript", ["-e", appleScript], { stdio: "inherit" })
+  } else {
+    result = spawnSync(portlessCommand, ["service", "install", "--port", String(CANONICAL_PROXY_PORT)], {
+      stdio: "inherit"
+    })
+  }
+
+  if (result.status !== 0) {
+    return {
+      success: false,
+      error: result.error?.message || "Portless service installer did not complete successfully"
+    }
+  }
+
+  const deadline = Date.now() + 10000
+  let status = getPortlessProxyStatus()
+  while ((!status.canonical || !status.serviceInstalled) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    status = getPortlessProxyStatus()
+  }
+
+  if (!status.canonical || !status.serviceInstalled) {
+    return {
+      success: false,
+      error: `Portless service installation completed, but canonical HTTPS routing did not become ready (target: ${status.target || "unavailable"}).`
+    }
+  }
+
+  return { success: true }
 }
 
 function canStartCanonicalProxyNonInteractively(): boolean {
@@ -183,11 +298,21 @@ export function preparePortlessRuntime(name: string): PortlessRuntimeResult {
     return { success: false, error: "Disabled by PORTLESS=0" }
   }
 
-  if (!isPortlessInstalled()) {
+  const status = getPortlessProxyStatus()
+  if (!status.installed) {
     return { success: false, error: "Portless is not installed" }
   }
 
-  if (!isProxyRunning()) {
+  if (!status.canonical || !status.serviceInstalled) {
+    if (status.proxyRunning) {
+      return {
+        success: false,
+        error: status.canonical
+          ? `Portless is running on canonical HTTPS port 443, but its startup service is not installed. ${PORTLESS_SETUP_HINT}`
+          : `Portless is running at ${status.target || "a non-canonical address"}, not canonical HTTPS port 443. ${PORTLESS_SETUP_HINT}`
+      }
+    }
+
     if (!canStartCanonicalProxyNonInteractively()) {
       return {
         success: false,
@@ -204,6 +329,14 @@ export function preparePortlessRuntime(name: string): PortlessRuntimeResult {
       return {
         success: false,
         error: `A port-free Portless proxy is not available. ${PORTLESS_SETUP_HINT}`
+      }
+    }
+
+    const startedStatus = getPortlessProxyStatus()
+    if (!startedStatus.canonical) {
+      return {
+        success: false,
+        error: `Portless did not start on canonical HTTPS port 443. ${PORTLESS_SETUP_HINT}`
       }
     }
   }

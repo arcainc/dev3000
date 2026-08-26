@@ -245,7 +245,7 @@ import { dirname, join, resolve } from "path"
 import { fileURLToPath } from "url"
 import { runRemoteSkillCommand, shouldUseRemoteSkillRunner } from "./commands/skill-runner.js"
 import { createPersistentLogFile, findAvailablePort, startDevEnvironment } from "./dev-environment.js"
-import { getPortlessCommand } from "./portless.js"
+import { getPortlessProxyStatus, installPortlessService } from "./portless.js"
 import { getBundledD3kSkillPath, getSkill, getSkillsInfo, listAvailableSkills } from "./skills/index.js"
 import { detectAIAgent } from "./utils/agent-detection.js"
 import { getAvailableAgents, getSkillsAgentId } from "./utils/agent-selection.js"
@@ -1355,6 +1355,18 @@ program
     const executablePath = process.argv[1]
     const commandName = executablePath.endsWith("/d3k") || executablePath.includes("/d3k") ? "d3k" : "dev3000"
     try {
+      const portlessEnabled = options.portless !== false
+      if (portlessEnabled) {
+        const portlessStatus = getPortlessProxyStatus()
+        if (portlessStatus.setupRequired) {
+          console.log(chalk.cyan("Canonical Portless HTTPS routing is not ready; setting it up now..."))
+          const setupResult = await installPortlessService()
+          if (!setupResult.success) {
+            throw new Error(setupResult.error || "Portless setup failed")
+          }
+        }
+      }
+
       // Create persistent log file
       const logFile = createPersistentLogFile(options.logFile)
 
@@ -1388,7 +1400,7 @@ program
         tail: options.tail,
         // TUI is opt-in now; only enable when explicitly requested and not in debug
         tui: options.tui === true && !options.debug,
-        portless: options.portless !== false && process.env.PORTLESS !== "0",
+        portless: portlessEnabled,
         customServerCommand: Boolean(options.command),
         dateTimeFormat: options.dateTime || "local",
         pluginReactScan: options.pluginReactScan || false,
@@ -1399,7 +1411,8 @@ program
         screenshotsDir: options.screenshotsDir
       })
     } catch (error) {
-      console.error(chalk.red("❌ Failed to start development environment:"), error)
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(chalk.red(`❌ Failed to start development environment: ${message}`))
       process.exit(1)
     }
   })
@@ -1407,17 +1420,37 @@ program
 const portlessCommand = program.command("portless").description("Set up the canonical port-free Portless proxy")
 
 portlessCommand
+  .command("status")
+  .description("Check whether canonical Portless HTTPS routing is ready")
+  .option("--json", "Output machine-readable Portless status")
+  .action((options) => {
+    const status = getPortlessProxyStatus()
+    if (options.json) {
+      console.log(JSON.stringify(status, null, 2))
+      return
+    }
+
+    console.log(
+      status.canonical
+        ? chalk.green("Canonical Portless HTTPS routing is ready.")
+        : chalk.yellow("Portless setup is required.")
+    )
+    if (status.target) console.log(chalk.gray(`Proxy target: ${status.target}`))
+    console.log(chalk.gray(`Startup service: ${status.serviceInstalled ? "installed" : "not installed"}`))
+    if (status.setupRequired) console.log(chalk.cyan("Run `d3k portless setup` once before starting d3k."))
+    process.exitCode = status.setupRequired ? 1 : 0
+  })
+
+portlessCommand
   .command("setup")
   .description("Install the HTTPS Portless proxy as an OS startup service on port 443")
-  .action(() => {
+  .action(async () => {
     console.log(chalk.cyan("Installing the Portless HTTPS service on port 443..."))
-    const result = spawnSync(getPortlessCommand(), ["service", "install", "--port", "443"], {
-      stdio: "inherit"
-    })
+    const result = await installPortlessService()
 
-    if (result.status !== 0) {
-      console.error(chalk.red("Portless service setup failed."))
-      process.exit(result.status ?? 1)
+    if (!result.success) {
+      console.error(chalk.red(`Portless service setup failed: ${result.error || "unknown error"}`))
+      process.exit(1)
     }
 
     console.log(chalk.green("Portless is ready. d3k will now use URLs such as https://my-app.localhost."))
