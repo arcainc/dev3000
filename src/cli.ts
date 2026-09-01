@@ -35,6 +35,15 @@ function findAgentBrowser(): string {
   const nativeName = `agent-browser-${os}-${arch}`
   const platformPkg = `${os}-${arch}`
 
+  // Embedders can pin the native CLI without relying on d3k's package
+  // installation layout. This is also the seam used by Arca's runtime
+  // resolver, which builds its agent-browser fork from source.
+  for (const configuredPath of [process.env.AGENT_BROWSER_PATH, process.env.ARCA_AGENT_BROWSER_BIN]) {
+    if (!configuredPath) continue
+    const runnablePath = getRunnablePath(configuredPath)
+    if (runnablePath) return runnablePath
+  }
+
   const cwd = process.cwd()
   const home = homedir()
 
