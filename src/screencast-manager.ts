@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { WebSocket } from "ws"
-import { DEV3000_CDP_BINDING_NAME } from "./cdp-monitor.js"
+import { DEV3000_CDP_BINDING_NAME, MAX_CDP_PAYLOAD_BYTES } from "./cdp-monitor.js"
 
 export interface ScreencastFrame {
   timestamp: number // ms since navigation start
@@ -144,7 +144,7 @@ export class ScreencastManager {
 
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket(this.cdpUrl)
+        this.ws = new WebSocket(this.cdpUrl, { maxPayload: MAX_CDP_PAYLOAD_BYTES })
         let pageEnableId: number
         let runtimeEnableId: number
         let bindingEnableId: number

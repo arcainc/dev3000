@@ -111,6 +111,10 @@ const EMBEDDED_LOADING_HTML = `<!DOCTYPE html>
 
 const DEFAULT_CDP_COMMAND_TIMEOUT_MS = 10000
 const DEFAULT_NAVIGATION_TIMEOUT_MS = 60000
+// Keep direct CDP clients from buffering an unbounded frame when a page emits
+// a pathological snapshot/screenshot. This matches agent-browser's native
+// transport limit while leaving ample room for normal diagnostic payloads.
+export const MAX_CDP_PAYLOAD_BYTES = 64 * 1024 * 1024
 export const DEV3000_CDP_BINDING_NAME = "__dev3000_emit"
 export const CHROME_CRASH_RESTORE_SUPPRESSION_FLAGS = [
   "--disable-session-crashed-bubble",
@@ -1037,7 +1041,7 @@ export class CDPMonitor {
 
         return new Promise((resolve, reject) => {
           this.debugLog(`Creating WebSocket connection to: ${wsUrl}`)
-          const ws = new WebSocket(wsUrl)
+          const ws = new WebSocket(wsUrl, { maxPayload: MAX_CDP_PAYLOAD_BYTES })
 
           // Increase max listeners to prevent warnings
           ws.setMaxListeners(20)
@@ -2523,7 +2527,7 @@ export class CDPMonitor {
     }
 
     await new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(version.webSocketDebuggerUrl as string)
+      const ws = new WebSocket(version.webSocketDebuggerUrl as string, { maxPayload: MAX_CDP_PAYLOAD_BYTES })
       let commandSent = false
       let settled = false
 
