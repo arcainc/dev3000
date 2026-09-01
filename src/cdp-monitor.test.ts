@@ -83,6 +83,39 @@ describe("d3k CDP telemetry binding", () => {
   })
 })
 
+describe("d3k CDP startup", () => {
+  it("enables independent domains concurrently", async () => {
+    const monitor = new CDPMonitor("/tmp/d3k-profile", "/tmp/d3k-screenshots", () => {})
+    let inFlight = 0
+    let maxInFlight = 0
+    const methods: string[] = []
+    const sendCDPCommand = vi.fn(async (method: string) => {
+      methods.push(method)
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      inFlight -= 1
+      return {}
+    })
+
+    Object.assign(monitor as unknown as Record<string, unknown>, { sendCDPCommand })
+    await (monitor as unknown as { enableCDPDomains: () => Promise<void> }).enableCDPDomains()
+
+    expect(maxInFlight).toBeGreaterThan(1)
+    expect(methods.slice(0, 8)).toEqual([
+      "Runtime.enable",
+      "Network.enable",
+      "Page.enable",
+      "DOM.enable",
+      "Performance.enable",
+      "Security.enable",
+      "Log.enable",
+      "Target.enable"
+    ])
+    expect(methods).toContain("Runtime.setAsyncCallStackDepth")
+  })
+})
+
 describe("selectCDPTarget", () => {
   it("prefers the current app target when Chrome exposes multiple pages", () => {
     const targets: CDPTargetInfo[] = [
