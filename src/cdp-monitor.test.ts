@@ -6,10 +6,115 @@ import {
   CDPMonitor,
   type CDPTargetInfo,
   CHROME_CRASH_RESTORE_SUPPRESSION_FLAGS,
+  DEV3000_CDP_BINDING_NAME,
   getLoadingHtmlCandidates,
+  parseDev3000TelemetryPayload,
   resetChromeCrashRestoreState,
   selectCDPTarget
 } from "./cdp-monitor"
+
+describe("d3k CDP telemetry binding", () => {
+  it("parses interaction events without trusting arbitrary payloads", () => {
+    const payload = JSON.stringify({
+      kind: "interaction",
+      interaction: { timestamp: 123, message: "CLICK at 10,20 on button" }
+    })
+
+    expect(DEV3000_CDP_BINDING_NAME).toBe("__dev3000_emit")
+    expect(parseDev3000TelemetryPayload(payload)).toEqual({
+      kind: "interaction",
+      interaction: { timestamp: 123, message: "CLICK at 10,20 on button" }
+    })
+  })
+
+  it("parses React telemetry state and rejects malformed events", () => {
+    expect(
+      parseDev3000TelemetryPayload(
+        JSON.stringify({
+          kind: "react",
+          event: { timestamp: 456, type: "operations-first" },
+          state: { rendererVersion: "19.1.0", bundleType: 1, operationsSeen: 1 }
+        })
+      )
+    ).toEqual({
+      kind: "react",
+      event: { timestamp: 456, type: "operations-first" },
+      state: { rendererVersion: "19.1.0", bundleType: 1, operationsSeen: 1 }
+    })
+
+    expect(parseDev3000TelemetryPayload("not-json")).toBeNull()
+    expect(parseDev3000TelemetryPayload(JSON.stringify({ kind: "interaction", interaction: {} }))).toBeNull()
+    expect(parseDev3000TelemetryPayload(JSON.stringify({ kind: "unknown" }))).toBeNull()
+  })
+
+  it("does not start the compatibility polling loop when the binding is active", async () => {
+    const monitor = new CDPMonitor("/tmp/d3k-profile", "/tmp/d3k-screenshots", () => {})
+    const sendCDPCommand = vi.fn()
+    Object.assign(monitor as unknown as Record<string, unknown>, {
+      interactionBindingAvailable: true,
+      sendCDPCommand
+    })
+
+    ;(monitor as unknown as { startInteractionPolling: () => void }).startInteractionPolling()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    expect(sendCDPCommand).not.toHaveBeenCalled()
+  })
+
+  it("routes binding events through the existing browser log path", () => {
+    const logs: string[] = []
+    const monitor = new CDPMonitor("/tmp/d3k-profile", "/tmp/d3k-screenshots", (_source, message) => {
+      logs.push(message)
+    })
+
+    ;(monitor as unknown as { setupEventHandlers: () => void }).setupEventHandlers()
+    ;(monitor as unknown as { handleCDPMessage: (message: unknown) => void }).handleCDPMessage({
+      method: "Runtime.bindingCalled",
+      params: {
+        name: DEV3000_CDP_BINDING_NAME,
+        payload: JSON.stringify({
+          kind: "interaction",
+          interaction: { timestamp: 123, message: "CLICK at 10,20 on button" }
+        })
+      }
+    })
+
+    expect(logs).toContain("[INTERACTION] CLICK at 10,20 on button")
+  })
+})
+
+describe("d3k CDP startup", () => {
+  it("enables independent domains concurrently", async () => {
+    const monitor = new CDPMonitor("/tmp/d3k-profile", "/tmp/d3k-screenshots", () => {})
+    let inFlight = 0
+    let maxInFlight = 0
+    const methods: string[] = []
+    const sendCDPCommand = vi.fn(async (method: string) => {
+      methods.push(method)
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      inFlight -= 1
+      return {}
+    })
+
+    Object.assign(monitor as unknown as Record<string, unknown>, { sendCDPCommand })
+    await (monitor as unknown as { enableCDPDomains: () => Promise<void> }).enableCDPDomains()
+
+    expect(maxInFlight).toBeGreaterThan(1)
+    expect(methods.slice(0, 8)).toEqual([
+      "Runtime.enable",
+      "Network.enable",
+      "Page.enable",
+      "DOM.enable",
+      "Performance.enable",
+      "Security.enable",
+      "Log.enable",
+      "Target.enable"
+    ])
+    expect(methods).toContain("Runtime.setAsyncCallStackDepth")
+  })
+})
 
 describe("selectCDPTarget", () => {
   it("prefers the current app target when Chrome exposes multiple pages", () => {
