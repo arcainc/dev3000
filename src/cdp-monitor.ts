@@ -1313,24 +1313,37 @@ export class CDPMonitor {
       // Note: Input domain is for dispatching events, not monitoring them - we use JS injection instead
     ]
 
-    for (const domain of domains) {
-      try {
-        this.debugLog(`Enabling CDP domain: ${domain.name}`)
-        await this.sendCDPCommand(`${domain.name}.enable`, {}, 3000)
-        this.debugLog(`Successfully enabled CDP domain: ${domain.name}`)
-        if (this.debug) {
-          this.logger("browser", `[CDP] Enabled ${domain.name} domain`)
+    // Domain enablement is independent. Sending these together removes one
+    // websocket round-trip per domain during startup while preserving the
+    // required/optional failure policy below.
+    const results = await Promise.all(
+      domains.map(async (domain) => {
+        try {
+          this.debugLog(`Enabling CDP domain: ${domain.name}`)
+          await this.sendCDPCommand(`${domain.name}.enable`, {}, 3000)
+          this.debugLog(`Successfully enabled CDP domain: ${domain.name}`)
+          if (this.debug) {
+            this.logger("browser", `[CDP] Enabled ${domain.name} domain`)
+          }
+          return { domain, error: null }
+        } catch (error) {
+          this.debugLog(`Failed to enable CDP domain ${domain.name}: ${error}`)
+          if (this.debug) {
+            this.logger(
+              "browser",
+              `[CDP] Failed to enable ${domain.required ? "required" : "optional"} ${domain.name} domain: ${error}`
+            )
+          }
+          return { domain, error }
         }
-      } catch (error) {
-        this.debugLog(`Failed to enable CDP domain ${domain.name}: ${error}`)
-        if (domain.required) {
-          throw new Error(`Failed to enable required CDP domain ${domain.name}: ${String(error)}`)
-        }
+      })
+    )
 
-        if (this.debug) {
-          this.logger("browser", `[CDP] Failed to enable optional ${domain.name}: ${error}`)
-        }
-      }
+    const requiredFailure = results.find((result) => result.domain.required && result.error)
+    if (requiredFailure?.error) {
+      throw new Error(
+        `Failed to enable required CDP domain ${requiredFailure.domain.name}: ${String(requiredFailure.error)}`
+      )
     }
 
     this.debugLog("Setting async call stack depth for console and exception capture")
