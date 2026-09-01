@@ -45,7 +45,7 @@
   ],
   "dependencies": {
     "@opentui/core": "0.5.8",
-    "agent-browser": "0.34.0",
+    "agent-browser": "0.36.0",
     "chalk": "^6.0.0",
     "commander": "15.0.0",
     "ink": "7.1.1",
