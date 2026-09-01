@@ -481,10 +481,9 @@ export class CDPMonitor {
     return null
   }
 
-  private debugLog(message: string) {
-    if (this.debug) {
-      console.log(`[CDP DEBUG] ${message}`)
-    }
+  private debugLog(message: string | (() => string)) {
+    if (!this.debug) return
+    console.log(`[CDP DEBUG] ${typeof message === "function" ? message() : message}`)
   }
 
   private async runCommand(
@@ -1006,9 +1005,10 @@ export class CDPMonitor {
         let targets = (await targetsResponse.json()) as CDPTargetInfo[]
 
         this.debugLog(
-          `Found ${targets.length} targets: ${JSON.stringify(
-            targets.map((target) => ({ type: target.type ?? "unknown", url: target.url ?? "" }))
-          )}`
+          () =>
+            `Found ${targets.length} targets: ${JSON.stringify(
+              targets.map((target) => ({ type: target.type ?? "unknown", url: target.url ?? "" }))
+            )}`
         )
 
         if (targets.length === 0) {
@@ -1200,7 +1200,7 @@ export class CDPMonitor {
         reject: (error) => reject(error)
       })
 
-      this.debugLog(`Sending CDP command #${id}: ${method} ${JSON.stringify(params)}`)
+      this.debugLog(() => `Sending CDP command #${id}: ${method} ${JSON.stringify(params)}`)
       this.connection?.ws.send(JSON.stringify(command), (error) => {
         if (!error) {
           return
@@ -1468,7 +1468,7 @@ export class CDPMonitor {
       // Debug: Log all console messages to see if tracking script is working
       if (args && args.length > 0) {
         this.debugLog(`Console message value: ${args[0].value}`)
-        this.debugLog(`Console message full arg: ${JSON.stringify(args[0])}`)
+        this.debugLog(() => `Console message full arg: ${JSON.stringify(args[0])}`)
       }
 
       // Debug: Log all console messages to see if tracking script is even running
@@ -1848,7 +1848,7 @@ export class CDPMonitor {
 
       const navigationTime = Date.now() - navigationStartTime
       this.debugLog(`Navigation command sent successfully (${navigationTime}ms)`)
-      this.debugLog(`Navigation result: ${JSON.stringify(result)}`)
+      this.debugLog(() => `Navigation result: ${JSON.stringify(result)}`)
 
       // Check if navigation was successful
       if (result.errorText) {
@@ -2218,14 +2218,14 @@ export class CDPMonitor {
         includeCommandLineAPI: false
       })
 
-      this.debugLog(`Interaction tracking script injected. Result: ${JSON.stringify(result)}`)
+      this.debugLog(() => `Interaction tracking script injected. Result: ${JSON.stringify(result)}`)
 
       // Log any errors from the script injection
       const resultWithDetails = result as {
         exceptionDetails?: { exception?: { description?: string } }
       }
       if (resultWithDetails.exceptionDetails) {
-        this.debugLog(`Script injection exception: ${JSON.stringify(resultWithDetails.exceptionDetails)}`)
+        this.debugLog(() => `Script injection exception: ${JSON.stringify(resultWithDetails.exceptionDetails)}`)
         this.logger(
           "browser",
           `[DEBUG] Script injection exception: ${
